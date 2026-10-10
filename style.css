@@ -1,0 +1,17 @@
+.ffgc-settings textarea.text_pole {
+    width: 100%;
+    resize: vertical;
+}
+
+.ffgc-settings label {
+    display: block;
+    margin-top: 8px;
+}
+
+.ffgc-settings .ffgc-member {
+    margin-top: 6px;
+}
+
+.ffgc-settings #ffgc_refresh {
+    margin-top: 10px;
+}

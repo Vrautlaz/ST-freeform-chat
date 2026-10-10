@@ -1,0 +1,12 @@
+{
+    "display_name": "Freeform Group Chat",
+    "loading_order": 20,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "Vikling",
+    "version": "0.3.0",
+    "auto_update": false,
+    "generate_interceptor": "freeformGroupChatInterceptor"
+}
