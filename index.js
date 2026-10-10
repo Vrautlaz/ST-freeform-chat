@@ -1,4 +1,4 @@
-// Freeform Group Chat — SillyTavern extension (v0.3.0)
+// Freeform Group Chat — SillyTavern extension (v0.4.0)
 //
 //  1. Scene tracking (saved per chat): location, time, atmosphere, situation, and a
 //     location for each group member. Characters who share a location can interact freely;
@@ -20,7 +20,7 @@ const defaultSettings = Object.freeze({
     instruction: '',
     autoTrack: true,        // ask the model where everyone is after each character message
     trackEvery: 1,          // ...every N character messages
-    trackTimeMood: false,   // also let the model update time and atmosphere
+    trackScene: true,       // also let the model keep default location, situation, time and mood current
 });
 
 const defaultScene = Object.freeze({
@@ -404,15 +404,21 @@ async function updateSceneFromChat(manual = false) {
                 ? `Known places: ${known.join(', ')}. Reuse these exact names whenever a character is in one of them. Only use a new short place name if a character is somewhere new.`
                 : 'No places are defined yet. Use short, consistent place names.',
             `Characters: ${members.map(m => m.name).join(', ')}`,
+            `Current scene: location = ${scene.location || 'unset'}; time = ${scene.time || 'unset'}; ` +
+                `atmosphere = ${scene.atmosphere || 'unset'}; situation = ${scene.situation || 'unset'}`,
             `Current positions:\n${current}`,
             `Recent messages:\n${recent}`,
             'Task: report where each character is NOW. Keep a character at their current position unless ' +
             'the messages clearly show they moved, left, or arrived somewhere. If someone left for an unnamed ' +
             'destination, use a short descriptive name (for example "On the road").',
-            settings.trackTimeMood
-                ? 'Also give the current time of day and a short mood/atmosphere (use an empty string if unclear).'
-                : 'Leave "time" and "atmosphere" as empty strings.',
-            'Format: {"characters": {"<name>": "<place>"}, "time": "", "atmosphere": ""}',
+            settings.trackScene
+                ? 'Also update the scene: "location" is the main place the scene is currently centered on ' +
+                  '(reuse a known place name if it fits); "time" is the time of day; "atmosphere" is a short ' +
+                  'mood; "situation" is a 1-2 sentence present-tense summary of what is happening right now ' +
+                  'and what is at stake. Keep the existing value unless the messages clearly show it changed, ' +
+                  'and use an empty string to mean "no change".'
+                : 'Leave "location", "time", "atmosphere" and "situation" as empty strings.',
+            'Format: {"characters": {"<name>": "<place>"}, "location": "", "time": "", "atmosphere": "", "situation": ""}',
         ].join('\n\n');
 
         const raw = await ctx.generateRaw({ prompt, systemPrompt });
@@ -427,9 +433,13 @@ async function updateSceneFromChat(manual = false) {
             const place = resolvePlace(byName.get(norm(member.name)), scene);
             if (place) scene.locations[member.avatar] = place;
         }
-        if (settings.trackTimeMood) {
-            if (typeof data.time === 'string' && data.time.trim()) scene.time = data.time.trim();
-            if (typeof data.atmosphere === 'string' && data.atmosphere.trim()) scene.atmosphere = data.atmosphere.trim();
+        if (settings.trackScene) {
+            const text = v => (typeof v === 'string' ? v.trim() : '');
+            const place = resolvePlace(text(data.location), scene);
+            if (place) scene.location = place;
+            if (text(data.time)) scene.time = trimTo(text(data.time), 100);
+            if (text(data.atmosphere)) scene.atmosphere = trimTo(text(data.atmosphere), 120);
+            if (text(data.situation)) scene.situation = trimTo(text(data.situation), 500);
         }
 
         saveScene();
@@ -479,7 +489,7 @@ function addSettingsUi() {
                 <label for="ffgc_trackevery">Update every N character messages</label>
                 <input id="ffgc_trackevery" class="text_pole" type="number" min="1" max="20" step="1" />
                 <label class="checkbox_label"><input id="ffgc_trackextra" type="checkbox" />
-                    <span>Also update time and mood</span></label>
+                    <span>Also keep situation, location, time and mood updated</span></label>
                 <div class="menu_button" id="ffgc_trackbtn">Update scene now</div>
                 <div id="ffgc_scene_box">
                     <label for="ffgc_location">Default location</label>
@@ -555,8 +565,8 @@ function addSettingsUi() {
     $('#ffgc_trackevery').val(settings.trackEvery).on('input', function () {
         settings.trackEvery = Math.max(1, Number($(this).val()) || 1); saveSettings();
     });
-    $('#ffgc_trackextra').prop('checked', settings.trackTimeMood).on('input', function () {
-        settings.trackTimeMood = $(this).prop('checked'); saveSettings();
+    $('#ffgc_trackextra').prop('checked', settings.trackScene).on('input', function () {
+        settings.trackScene = $(this).prop('checked'); saveSettings();
     });
     $('#ffgc_trackbtn').on('click', () => updateSceneFromChat(true));
 
